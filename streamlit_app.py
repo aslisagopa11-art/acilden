@@ -2,102 +2,141 @@ import streamlit as st
 import google.generativeai as genai
 import json
 
-# 1. Sayfa Ayarları (Geniş Ekran)
+# 1. Sayfa Ayarları (Geniş ve Şık)
 st.set_page_config(
-    page_title="Gemlik Emlak Değerleme",
-    page_icon="🏠",
-    layout="wide"
+    page_title="Gemlik Gayrimenkul Ekspertiz",
+    page_icon="🏡",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# 2. API Anahtarını Al (Streamlit Secrets'tan)
+# --- TASARIM İÇİN CSS (Lüks Kartlar ve Gölgeler) ---
+st.markdown("""
+<style>
+    /* Ana Arkaplan */
+    .main { background-color: #f8f9fa; }
+    h1 { color: #1e3a8a; font-family: 'Helvetica Neue', sans-serif; }
+    
+    /* Fiyat Kartları Tasarımı */
+    .metric-card {
+        background-color: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+    }
+    .metric-label {
+        font-size: 14px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .metric-value {
+        font-size: 28px;
+        font-weight: 800;
+        margin: 10px 0;
+    }
+    .metric-sub {
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 20px;
+        display: inline-block;
+    }
+    
+    /* Renk Temaları */
+    .card-red { border-top: 5px solid #ef4444; }
+    .text-red { color: #ef4444; }
+    .bg-red-light { background-color: #fee2e2; color: #991b1b; }
+    
+    .card-blue { border-top: 5px solid #3b82f6; }
+    .text-blue { color: #3b82f6; }
+    .bg-blue-light { background-color: #dbeafe; color: #1e40af; }
+    
+    .card-purple { border-top: 5px solid #a855f7; }
+    .text-purple { color: #a855f7; }
+    .bg-purple-light { background-color: #f3e8ff; color: #6b21a8; }
+    
+    /* Buton Tasarımı */
+    .stButton>button {
+        width: 100%;
+        background-color: #2563eb;
+        color: white;
+        font-weight: bold;
+        border-radius: 10px;
+        height: 50px;
+        border: none;
+    }
+    .stButton>button:hover { background-color: #1d4ed8; }
+</style>
+""", unsafe_allow_html=True)
+
+# 2. API Anahtarını Kontrol Et
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except:
-    st.error("Lütfen Streamlit panelinden API anahtarını (GEMINI_API_KEY) ayarlayın.")
+    st.error("⚠️ API Anahtarı Bulunamadı! Lütfen Streamlit Secrets ayarlarını kontrol edin.")
     st.stop()
 
-# 3. Sol Menü (Sidebar) - Kullanıcı Girişleri
+# 3. Sol Menü (Sidebar)
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/1040/1040993.png", width=100)
-    st.title("Mülk Bilgileri")
+    st.image("https://cdn-icons-png.flaticon.com/512/1040/1040993.png", width=80)
+    st.title("Mülk Detayları")
     
-    mahalle = st.selectbox(
-        "Mahalle Seçiniz",
-        ["Cumhuriyet (Manastır)", "Dr. Ziya Kaya", "Eşref Dinçer", "Hamidiye", "Kumla", "Kurşunlu", "Osmaniye", "Umurbey"]
-    )
-    
+    mahalle = st.selectbox("Mahalle", ["Cumhuriyet (Manastır)", "Dr. Ziya Kaya", "Eşref Dinçer", "Hamidiye", "Kumla", "Kurşunlu", "Osmaniye", "Umurbey"])
     emlak_tipi = st.selectbox("Emlak Tipi", ["Daire", "Villa", "Müstakil", "Yazlık", "Arsa"])
     oda_sayisi = st.selectbox("Oda Sayısı", ["1+1", "2+1", "3+1", "4+1", "5+1", "Dubleks"])
-    m2 = st.number_input("Net Metrekare (m2)", min_value=30, max_value=1000, value=110)
-    bina_yasi = st.number_input("Bina Yaşı", min_value=0, max_value=50, value=5)
-    
-    hesapla_btn = st.button("🔍 Fiyatı Analiz Et", type="primary")
-    
+    col1, col2 = st.columns(2)
+    with col1: m2 = st.number_input("Net m²", value=110)
+    with col2: bina_yasi = st.number_input("Bina Yaşı", value=5)
+        
+    hesapla_btn = st.button("🚀 ANALİZİ BAŞLAT")
     st.markdown("---")
     st.caption("© 2025 Gemlik Emlak | Rasim Kılıç")
 
-# 4. Ana Ekran (Sağ Taraf)
-st.title("🏡 Gemlik Gayrimenkul Ekspertiz Robotu")
+# 4. Ana Ekran
+st.title("Gemlik Gayrimenkul Ekspertiz Robotu")
 st.markdown("Gemlik bölgesindeki güncel piyasa verileri ve yapay zeka analizi ile mülkünüzün gerçek değerini öğrenin.")
 st.divider()
 
+# 5. Hesaplama Mantığı
 if hesapla_btn:
-    with st.spinner('Yapay Zeka bölgeyi analiz ediyor, emsalleri tarıyor... Lütfen bekleyin.'):
+    with st.spinner('Yapay zeka bölgeyi tarıyor, emsalleri karşılaştırıyor...'):
         try:
-            # Yapay Zekaya Gidecek Emir (Prompt)
+            model = genai.GenerativeModel('gemini-pro')
+            
             prompt = f"""
-            Sen Gemlik bölgesinde 20 yıllık deneyime sahip uzman bir emlak danışmanısın (Rasim Kılıç).
-            Aşağıdaki mülk için Sahibinden.com, Hepsiemlak ve Zingat verilerini simüle ederek bir değerleme yap.
+            Sen Bursa Gemlik bölgesinde uzman bir emlakçısın.
+            MÜLK: {mahalle}, {bina_yasi} yaşında, {m2} m2, {oda_sayisi}, {emlak_tipi}.
             
-            Mülk Bilgileri:
-            - Bölge: Gemlik, {mahalle} Mahallesi
-            - Tip: {emlak_tipi}
-            - Özellikler: {oda_sayisi}, {m2} m2, {bina_yasi} yaşında.
-            
-            Lütfen cevabı SADECE aşağıdaki JSON formatında ver (Başka yazı yazma):
+            GÖREV: SADECE aşağıdaki JSON formatında çıktı ver:
             {{
-                "acil_satis": "X.XXX.XXX TL",
-                "piyasa_degeri": "X.XXX.XXX TL",
-                "tok_satici": "X.XXX.XXX TL",
-                "yorum": "Buraya mülkün konumu, avantajları ve piyasa durumu hakkında detaylı, profesyonel bir yorum yaz."
+                "acil_fiyat": "X.XXX.XXX TL",
+                "piyasa_fiyat": "X.XXX.XXX TL",
+                "tok_fiyat": "X.XXX.XXX TL",
+                "yorum": "Mülk hakkında 3 cümlelik uzman yorumu."
             }}
             """
             
-            # Modeli Çalıştır
-            model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
+            text = response.text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(text)
             
-            # Gelen veriyi temizle ve JSON'a çevir
-            text_response = response.text.replace("```json", "").replace("```", "")
-            data = json.loads(text_response)
+            # --- LÜKS KARTLAR ---
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"""<div class="metric-card card-red"><div class="metric-label text-red">🔥 ACİL SATIŞ</div><div class="metric-value text-red">{data['acil_fiyat']}</div><div class="metric-sub bg-red-light">Hızlı Nakit</div></div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class="metric-card card-blue"><div class="metric-label text-blue">⚖️ GERÇEK PİYASA</div><div class="metric-value text-blue">{data['piyasa_fiyat']}</div><div class="metric-sub bg-blue-light">Ortalama Değer</div></div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div class="metric-card card-purple"><div class="metric-label text-purple">💎 TOK SATICI</div><div class="metric-value text-purple">{data['tok_fiyat']}</div><div class="metric-sub bg-purple-light">Yüksek Hedef</div></div>""", unsafe_allow_html=True)
             
-            # 5. Sonuçları Göster (3'lü Kart Yapısı)
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.error("Acil Satış Fiyatı")
-                st.metric(label="1-7 Gün İçinde Nakit", value=data["acil_satis"], delta="- %15 Fırsat")
-            
-            with col2:
-                st.info("Gerçek Piyasa Değeri")
-                st.metric(label="Ortalama İşlem Süresi", value=data["piyasa_degeri"], delta="Piyasa Ortalaması")
+            st.success("✅ Analiz Tamamlandı")
+            st.info(data['yorum'])
                 
-            with col3:
-                st.warning("Tok Satıcı Fiyatı")
-                st.metric(label="Bekleme Süresi Yüksek", value=data["tok_satici"], delta="+ %10 Kâr Hedefi")
-            
-            st.divider()
-            
-            # 6. Uzman Yorumu ve Rapor
-            st.subheader("📋 Yapay Zeka Ekspertiz Raporu")
-            st.info(data["yorum"])
-            
-            st.success("Bu rapor, bölge verileri ve yapay zeka tahminleri ile oluşturulmuştur. Kesin sonuç için yerinde inceleme gerekir.")
-            
         except Exception as e:
-            st.error(f"Bir hata oluştu. Lütfen tekrar deneyin. Hata: {str(e)}")
-
+            st.error(f"Hata: {e}")
 else:
-    # Başlangıçta boş durmasın diye bilgi mesajı
-    st.info("👈 Sol taraftaki menüden mülk bilgilerini girip 'Fiyatı Analiz Et' butonuna basınız.")
+    st.info("👈 Analize başlamak için sol menüyü kullanın.")
