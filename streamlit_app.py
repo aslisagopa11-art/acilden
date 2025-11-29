@@ -89,3 +89,7 @@ if submit_button:
             
         except Exception as e:
             st.error(f"Bir hata oluştu: {e}")
+            st.warning("Lütfen sayfayı yenileyip tekrar deneyin.")
+
+else:
+    st.info("👈 Lütfen sol taraftan bilgileri seçip butona basın.")
