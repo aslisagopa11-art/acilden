@@ -1,151 +1,103 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
+import google.generativeai as genai
+import json
 
-# Set the title and favicon that appear in the Browser's tab bar.
+# 1. Sayfa Ayarları (Geniş Ekran)
 st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
+    page_title="Gemlik Emlak Değerleme",
+    page_icon="🏠",
+    layout="wide"
 )
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# 2. API Anahtarını Al (Streamlit Secrets'tan)
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+except:
+    st.error("Lütfen Streamlit panelinden API anahtarını (GEMINI_API_KEY) ayarlayın.")
+    st.stop()
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
-
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
+# 3. Sol Menü (Sidebar) - Kullanıcı Girişleri
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/1040/1040993.png", width=100)
+    st.title("Mülk Bilgileri")
+    
+    mahalle = st.selectbox(
+        "Mahalle Seçiniz",
+        ["Cumhuriyet (Manastır)", "Dr. Ziya Kaya", "Eşref Dinçer", "Hamidiye", "Kumla", "Kurşunlu", "Osmaniye", "Umurbey"]
     )
+    
+    emlak_tipi = st.selectbox("Emlak Tipi", ["Daire", "Villa", "Müstakil", "Yazlık", "Arsa"])
+    oda_sayisi = st.selectbox("Oda Sayısı", ["1+1", "2+1", "3+1", "4+1", "5+1", "Dubleks"])
+    m2 = st.number_input("Net Metrekare (m2)", min_value=30, max_value=1000, value=110)
+    bina_yasi = st.number_input("Bina Yaşı", min_value=0, max_value=50, value=5)
+    
+    hesapla_btn = st.button("🔍 Fiyatı Analiz Et", type="primary")
+    
+    st.markdown("---")
+    st.caption("© 2025 Gemlik Emlak | Rasim Kılıç")
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+# 4. Ana Ekran (Sağ Taraf)
+st.title("🏡 Gemlik Gayrimenkul Ekspertiz Robotu")
+st.markdown("Gemlik bölgesindeki güncel piyasa verileri ve yapay zeka analizi ile mülkünüzün gerçek değerini öğrenin.")
+st.divider()
 
-    return gdp_df
+if hesapla_btn:
+    with st.spinner('Yapay Zeka bölgeyi analiz ediyor, emsalleri tarıyor... Lütfen bekleyin.'):
+        try:
+            # Yapay Zekaya Gidecek Emir (Prompt)
+            prompt = f"""
+            Sen Gemlik bölgesinde 20 yıllık deneyime sahip uzman bir emlak danışmanısın (Rasim Kılıç).
+            Aşağıdaki mülk için Sahibinden.com, Hepsiemlak ve Zingat verilerini simüle ederek bir değerleme yap.
+            
+            Mülk Bilgileri:
+            - Bölge: Gemlik, {mahalle} Mahallesi
+            - Tip: {emlak_tipi}
+            - Özellikler: {oda_sayisi}, {m2} m2, {bina_yasi} yaşında.
+            
+            Lütfen cevabı SADECE aşağıdaki JSON formatında ver (Başka yazı yazma):
+            {{
+                "acil_satis": "X.XXX.XXX TL",
+                "piyasa_degeri": "X.XXX.XXX TL",
+                "tok_satici": "X.XXX.XXX TL",
+                "yorum": "Buraya mülkün konumu, avantajları ve piyasa durumu hakkında detaylı, profesyonel bir yorum yaz."
+            }}
+            """
+            
+            # Modeli Çalıştır
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            
+            # Gelen veriyi temizle ve JSON'a çevir
+            text_response = response.text.replace("```json", "").replace("```", "")
+            data = json.loads(text_response)
+            
+            # 5. Sonuçları Göster (3'lü Kart Yapısı)
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.error("Acil Satış Fiyatı")
+                st.metric(label="1-7 Gün İçinde Nakit", value=data["acil_satis"], delta="- %15 Fırsat")
+            
+            with col2:
+                st.info("Gerçek Piyasa Değeri")
+                st.metric(label="Ortalama İşlem Süresi", value=data["piyasa_degeri"], delta="Piyasa Ortalaması")
+                
+            with col3:
+                st.warning("Tok Satıcı Fiyatı")
+                st.metric(label="Bekleme Süresi Yüksek", value=data["tok_satici"], delta="+ %10 Kâr Hedefi")
+            
+            st.divider()
+            
+            # 6. Uzman Yorumu ve Rapor
+            st.subheader("📋 Yapay Zeka Ekspertiz Raporu")
+            st.info(data["yorum"])
+            
+            st.success("Bu rapor, bölge verileri ve yapay zeka tahminleri ile oluşturulmuştur. Kesin sonuç için yerinde inceleme gerekir.")
+            
+        except Exception as e:
+            st.error(f"Bir hata oluştu. Lütfen tekrar deneyin. Hata: {str(e)}")
 
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+else:
+    # Başlangıçta boş durmasın diye bilgi mesajı
+    st.info("👈 Sol taraftaki menüden mülk bilgilerini girip 'Fiyatı Analiz Et' butonuna basınız.")
