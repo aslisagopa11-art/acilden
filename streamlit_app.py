@@ -105,8 +105,7 @@ st.divider()
 if hesapla_btn:
     with st.spinner('Yapay zeka bölgeyi tarıyor, emsalleri karşılaştırıyor...'):
         try:
-            model = genai.GenerativeModel('gemini-pro')
-            
+model = genai.GenerativeModel('gemini-1.5-flash')            
             prompt = f"""
             Sen Bursa Gemlik bölgesinde uzman bir emlakçısın.
             MÜLK: {mahalle}, {bina_yasi} yaşında, {m2} m2, {oda_sayisi}, {emlak_tipi}.
