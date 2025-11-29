@@ -101,41 +101,4 @@ st.title("Gemlik Gayrimenkul Ekspertiz Robotu")
 st.markdown("Gemlik bölgesindeki güncel piyasa verileri ve yapay zeka analizi ile mülkünüzün gerçek değerini öğrenin.")
 st.divider()
 
-# 5. Hesaplama Mantığı
-if hesapla_btn:
-    with st.spinner('Yapay zeka bölgeyi tarıyor, emsalleri karşılaştırıyor...'):
-        try:
-model = genai.GenerativeModel('gemini-1.5-flash')            
-            prompt = f"""
-            Sen Bursa Gemlik bölgesinde uzman bir emlakçısın.
-            MÜLK: {mahalle}, {bina_yasi} yaşında, {m2} m2, {oda_sayisi}, {emlak_tipi}.
-            
-            GÖREV: SADECE aşağıdaki JSON formatında çıktı ver:
-            {{
-                "acil_fiyat": "X.XXX.XXX TL",
-                "piyasa_fiyat": "X.XXX.XXX TL",
-                "tok_fiyat": "X.XXX.XXX TL",
-                "yorum": "Mülk hakkında 3 cümlelik uzman yorumu."
-            }}
-            """
-            
-            response = model.generate_content(prompt)
-            text = response.text.replace("```json", "").replace("```", "").strip()
-            data = json.loads(text)
-            
-            # --- LÜKS KARTLAR ---
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f"""<div class="metric-card card-red"><div class="metric-label text-red">🔥 ACİL SATIŞ</div><div class="metric-value text-red">{data['acil_fiyat']}</div><div class="metric-sub bg-red-light">Hızlı Nakit</div></div>""", unsafe_allow_html=True)
-            with c2:
-                st.markdown(f"""<div class="metric-card card-blue"><div class="metric-label text-blue">⚖️ GERÇEK PİYASA</div><div class="metric-value text-blue">{data['piyasa_fiyat']}</div><div class="metric-sub bg-blue-light">Ortalama Değer</div></div>""", unsafe_allow_html=True)
-            with c3:
-                st.markdown(f"""<div class="metric-card card-purple"><div class="metric-label text-purple">💎 TOK SATICI</div><div class="metric-value text-purple">{data['tok_fiyat']}</div><div class="metric-sub bg-purple-light">Yüksek Hedef</div></div>""", unsafe_allow_html=True)
-            
-            st.success("✅ Analiz Tamamlandı")
-            st.info(data['yorum'])
-                
-        except Exception as e:
-            st.error(f"Hata: {e}")
-else:
-    st.info("👈 Analize başlamak için sol menüyü kullanın.")
+# 5. Hesaplama
